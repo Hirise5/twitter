@@ -1,0 +1,51 @@
+local internet = require("internet")
+local screen = peripheral.find("monitor")
+
+-- Remplacez les valeurs ci-dessous par vos propres informations d'API Twitter
+local bearer_token = "votre jeton d'authentification de porteur ici"
+local hashtag = "votre hashtag ici"
+
+-- Fonction pour récupérer les derniers tweets contenant le hashtag spécifié
+local function getTweets()
+  local url = "https://api.twitter.com/2/tweets/search/recent?query=" .. hashtag .. "&max_results=6&tweet.fields=text,created_at&expansions=author_id&user.fields=name,profile_image_url"
+  local headers = { Authorization = "Bearer " .. bearer_token }
+  local response = internet.request(url, headers)
+  local responseBody = response.readAll()
+  local tweets = {}
+  for _, tweet in ipairs(json.decode(responseBody).data) do
+    local author = json.decode(responseBody).includes.users[1]
+    local tweetText = "\"" .. tweet.text:gsub("\"", "\\\"") .. "\""
+    local tweetDate = os.date("%d/%m/%Y", os.time{year=string.sub(tweet.created_at, 1, 4), month=string.sub(tweet.created_at, 6, 7), day=string.sub(tweet.created_at, 9, 10)})
+    local tweetTime = os.date("%H:%M", os.time{hour=string.sub(tweet.created_at, 12, 13), min=string.sub(tweet.created_at, 15, 16)})
+    local tweetAuthor = author.name
+    local tweetAuthorImage = author.profile_image_url
+    table.insert(tweets, {tweetText, tweetDate, tweetTime, tweetAuthor, tweetAuthorImage})
+  end
+  return tweets
+end
+
+-- Fonction pour afficher les tweets sur l'écran
+local function displayTweets(tweets)
+  for i = 1, #tweets do
+    local tweet = tweets[i]
+    screen.setCursorPos(1, (i-1)*2+1)
+    screen.write(string.sub(tweet[1], 1, 32))
+    screen.setCursorPos(1, (i-1)*2+2)
+    screen.write(tweet[2] .. " " .. tweet[3])
+    screen.setCursorPos(34, (i-1)*2+1)
+    screen.blit(string.rep(" ", 3), string.rep("0", 3), "8")
+    screen.setCursorPos(34, (i-1)*2+2)
+    screen.blit(string.rep(" ", 3), string.rep("0", 3), "8")
+    screen.drawImageURL(tweet[5], 35, (i-1)*2+1, 2, 2)
+    screen.setCursorPos(38, (i-1)*2+1)
+    screen.write(string.sub(tweet[4], 1, 10))
+  end
+end
+
+-- Boucle principale pour récupérer et afficher les tweets toutes les 30 secondes
+while true do
+  local tweets = getTweets()
+  screen.clear()
+  displayTweets(tweets)
+  os.sleep(30)
+end
